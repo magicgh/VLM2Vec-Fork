@@ -18,6 +18,7 @@ LLAVA_IMAGE_TOKEN_ID = 32000
 
 def process_vlm_inputs(model_inputs: dict, processor, backbone_name, max_length=None):
     input_ids, pixel_values, image_sizes, image_grid_thw = [], [], [], []
+    patch_assign, patch_assign_sep, patch_assign_len, patch_pos, select_mask = [], [], [], [], []
     texts, images = model_inputs['text'], model_inputs['image']
     image_exists = False
     # 1. iterate each pair and process (since processors do not support batch processing)
@@ -37,6 +38,11 @@ def process_vlm_inputs(model_inputs: dict, processor, backbone_name, max_length=
             pixel_values.append(None)
             image_sizes.append(None)
             image_grid_thw.append(None)
+            patch_assign.append(None)
+            patch_assign_sep.append(None)
+            patch_assign_len.append(None)
+            patch_pos.append(None)
+            select_mask.append(None)
         else:
             image_exists = True
             if backbone_name == LLAVA_NEXT:
@@ -51,6 +57,16 @@ def process_vlm_inputs(model_inputs: dict, processor, backbone_name, max_length=
                 image_sizes.append(inputs['image_sizes'])
             if 'image_grid_thw' in inputs:
                 image_grid_thw.append(inputs['image_grid_thw'])
+            if 'patch_assign' in inputs:
+                patch_assign.append(inputs['patch_assign'])
+            if 'patch_assign_sep' in inputs:
+                patch_assign_sep.append(inputs['patch_assign_sep'])
+            if 'patch_assign_len' in inputs:
+                patch_assign_len.append(inputs['patch_assign_len'])
+            if 'patch_pos' in inputs:
+                patch_pos.append(inputs['patch_pos'])
+            if 'select_mask' in inputs:
+                select_mask.append(inputs['select_mask'])
 
     # 2. padding inputs
     batch_encoding = processor.tokenizer.pad({'input_ids': input_ids}, return_tensors="pt")
@@ -81,6 +97,36 @@ def process_vlm_inputs(model_inputs: dict, processor, backbone_name, max_length=
                 image_grid_thw = [torch.from_numpy(v) if v is not None else image_grid_thw_for_padding for v in image_grid_thw]
                 image_grid_thw = torch.cat(image_grid_thw, dim=0)
                 inputs['image_grid_thw'] = image_grid_thw
+            if patch_assign:
+                patch_assign_shape_for_padding = list(v.shape for v in patch_assign if v is not None)[0]
+                patch_assign = [torch.from_numpy(v) if v is not None else torch.zeros(patch_assign_shape_for_padding) for v in patch_assign]
+                patch_assign = torch.cat(patch_assign, dim=0)
+                inputs['patch_assign'] = patch_assign
+            if patch_assign_sep:
+                patch_assign_sep_shape_for_padding = list(v.shape for v in patch_assign_sep if v is not None)[0]
+                patch_assign_sep = [torch.from_numpy(v) if v is not None else torch.zeros(patch_assign_sep_shape_for_padding) for v in patch_assign_sep]
+                patch_assign_sep = torch.cat(patch_assign_sep, dim=0)
+                inputs['patch_assign_sep'] = patch_assign_sep
+            if patch_assign_len:
+                patch_assign_len_shape_for_padding = list(v.shape for v in patch_assign_len if v is not None)[0]
+                patch_assign_len = [torch.from_numpy(v) if v is not None else torch.zeros(patch_assign_len_shape_for_padding) for v in patch_assign_len]
+                patch_assign_len = torch.cat(patch_assign_len, dim=0)
+                inputs['patch_assign_len'] = patch_assign_len
+            if patch_pos:
+                patch_pos_shape_for_padding = list(v.shape for v in patch_pos if v is not None)[0]
+                key_tmp = [torch.from_numpy(v) if v is not None else torch.zeros(patch_pos_shape_for_padding) for v in patch_pos]
+                max_length = key_tmp[0].size(0)
+                padded_key = [torch.nn.functional.pad(pos, (0, max_length - pos.size(0)), value=0) for pos in key_tmp]
+                patch_pos = torch.cat(padded_key, dim=0)
+                inputs['patch_pos'] = patch_pos
+            if select_mask:
+                select_mask_shape_for_padding = list(v.shape for v in select_mask if v is not None)[0]
+                key_tmp = [torch.from_numpy(v) if v is not None else torch.zeros(select_mask_shape_for_padding) for v in select_mask]
+                max_length = key_tmp[0].size(0)
+                padded_key = [torch.nn.functional.pad(pos, (0, max_length - pos.size(0)), value=0) for pos in key_tmp]
+                select_mask = torch.cat(padded_key, dim=0)
+                inputs['select_mask'] = select_mask
+
         # add them to inputs
         inputs['pixel_values'] = pixel_values
         inputs['image_sizes'] = image_sizes

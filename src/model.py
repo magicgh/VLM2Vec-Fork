@@ -88,12 +88,31 @@ class MMEBModel(nn.Module):
             config._attn_implementation = "flash_attention_2"
             config.padding_side = "left"
             config.use_cache = False
-            base_model = backbone2model[model_backbone].from_pretrained(
-                model_args.model_name,
-                config=config,
-                torch_dtype=torch.bfloat16,
-                low_cpu_mem_usage=True,
-            )
+
+            if model_backbone == QWEN2_VL:
+                from utils import parse_layer_type
+                lm_qwen_layer = 28
+                vis_qwen_layer = 32
+                lm_skip_layer = parse_layer_type(model_args.lm_skip_layer, lm_qwen_layer)
+                vis_skip_layer = parse_layer_type(model_args.vis_skip_layer, vis_qwen_layer)
+
+                base_model = backbone2model[model_backbone].from_pretrained(
+                    model_args.model_name,
+                    config=config,
+                    torch_dtype=torch.bfloat16,
+                    low_cpu_mem_usage=True,
+                    lm_skip_layer=lm_skip_layer,
+                    lm_skip_ratio=model_args.lm_skip_ratio,
+                )
+
+            else:
+                base_model = backbone2model[model_backbone].from_pretrained(
+                    model_args.model_name,
+                    config=config,
+                    torch_dtype=torch.bfloat16,
+                    low_cpu_mem_usage=True,
+                )
+
         else:
             config.use_cache = False
             base_model = cls.TRANSFORMER_CLS.from_pretrained(

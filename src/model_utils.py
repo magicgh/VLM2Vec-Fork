@@ -75,7 +75,10 @@ def load_processor(model_args):
         processor = Qwen2VLProcessor.from_pretrained(
             model_name,
             image_processor=image_processor, tokenizer=tokenizer,
-            min_pixels=256 * 28 * 28, max_pixels=1280 * 28 * 28
+            min_pixels=256 * 28 * 28, max_pixels=1280 * 28 * 28,
+            uigraph_train=model_args.uigraph_train, uigraph_test=model_args.uigraph_test,
+            uigraph_diff=model_args.uigraph_diff,  uigraph_rand=model_args.uigraph_rand,
+            uimask_pre=model_args.uimask_pre, uimask_ratio=model_args.uimask_ratio, uimask_rand=model_args.uimask_rand
         )
     elif model_args.model_backbone == QWEN2_5_VL:
         from src.vlm_backbone.qwen2_5_vl.processing_qwen2_5_vl import Qwen2_5_VLProcessor
